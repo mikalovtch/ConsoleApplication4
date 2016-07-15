@@ -25,11 +25,13 @@ struct inpout
 	string input;
 	string result;
 };
-vector<string> checkpoints;
+
 omp_lock_t lock;
 CFileFind finder;
 WIN32_FIND_DATA fd;
 SYSTEMTIME st;
+bool flag;
+string check_path = "..\\files\\checkpoint\\checkpoints.txt";
 
 char * strToChar(string s)
 {
@@ -85,11 +87,28 @@ void output(vector <string> &arr, string name)	//Выводим вектор в файл
 	ofstream fout;
 	fout.open(name, ios::out);
 	if (fout.is_open()) {
-	//while (arr.size())
-	//	{
+		//while (arr.size())
+		//	{
+		fout << arr.back() << endl;
+		arr.pop_back();
+		//	}
+		fout.close();
+	}
+	else
+	{
+		cout << "Не могу открыть файл: " << name << endl;
+	}
+}
+void outputCheck(vector <string> &arr, string name)	//Выводим вектор в файл
+{
+	ofstream fout;
+	fout.open(name, ios::out);
+	if (fout.is_open()) {
+		while (arr.size())
+		{
 			fout << arr.back() << endl;
 			arr.pop_back();
-	//	}
+		}
 		fout.close();
 	}
 	else
@@ -131,19 +150,18 @@ string Sha256(const string str)
 	return ss.str();
 }
 
-void init(vector<string> &arr, string find) //Инициализация настроек
+void init(vector<string> &arr, vector<string> &checkpoints, string find) //Инициализация настроек
 {
 	vector<string> set;
 	ifstream inpfile("..\\files\\settings\\settings.txt");
 	if (inpfile.is_open())
 	{
-		string str;
 		while (!inpfile.eof())
 		{
+			string str;
 			getline(inpfile, str);
 			set.push_back(str);
 		}
-		inpfile.close();
 	}
 	else {
 		cout << "Ошибка открытия файла с настройками!" << endl << "Требуется перезапуск!" << endl;
@@ -158,15 +176,30 @@ void init(vector<string> &arr, string find) //Инициализация настроек
 			getline(inpfile, str);
 			arr.push_back(str);
 		}
-		inpfile.close();
 	}
 	else {
 		cout << "Ошибка открытия файла с исходными строками!" << endl << "Требуется перезапуск!" << endl;
 	}
-	find = set.at(0).substr((0, set.at(0).find_first_of(" //")));
+	find = set.at(0);
 	maxsize = stoi(set.at(1));
 	maxfile = stoi(set.at(2));
 	checkstep = stoi(set.at(3));
+	inpfile.open("..\\files\\checkpoint\\checkpoints.txt");
+	if (inpfile.is_open())
+	{
+		while (!inpfile.eof())
+		{
+			string str;
+			getline(inpfile, str);
+			checkpoints.push_back(str);
+		}
+		inpfile.close();
+	}
+	else {
+		cout << "Файл чекпоинтов не найден!" << endl;
+	}
+	inpfile.close();
+	//	return true;
 }
 
 void out(vector<string> &arr, int num)
@@ -197,27 +230,37 @@ void out(vector<string> &arr, int num)
 		infile.open(file1);
 	}
 	string name = "..\\files\\damps\\damp" + to_string(num) + "_" + to_string(oldfile) + ".txt";
-	//omp_set_lock(&lock);
+	omp_set_lock(&lock);
 	output(arr, name); //Вывод в файл
-//	omp_unset_lock(&lock);
+	omp_unset_lock(&lock);
 }
-
-void work(string find, string val, int num)		//Выполняем хеширование
+void stop(vector<string> &checkpoints)
+{
+	flag = false;
+	cout << "Остановка программы";
+	outputCheck(checkpoints, check_path);
+	system("Pause");
+	exit(0);
+}
+void work(string find, string val, vector<string> &checkpoints, int num)		//Выполняем хеширование
 {
 	vector <string> arr;
 
 	std::vector<string>::iterator a;
 	int j = 0;
-	while (val != find)
+	while (val != find&&!GetAsyncKeyState(VK_ESCAPE))
 	{
 		val = Sha256(val); //Получаем новый хеш
-		if (((std::find(checkpoints.begin(),checkpoints.end(), val))!=checkpoints.end()))
+		if (((std::find(checkpoints.begin(), checkpoints.end(), val)) != checkpoints.end()))
 		{
-			omp_set_lock(&lock);
-			cout << "Поток номер" << num << "закончил работу!" << endl;
-			cout << "SHA256=" << val;
-			omp_unset_lock(&lock);
-			exit(-1);
+			
+			cout << "Поток номер " << num << " закончил работу!" << endl;
+			checkpoints.push_back(val);
+			outputCheck(checkpoints, check_path);
+			cout << "SHA256=" << val<<endl;
+			
+			system("Pause");
+			exit(0);
 		}
 		else {
 			if (j > checkstep)
@@ -233,38 +276,41 @@ void work(string find, string val, int num)		//Выполняем хеширование
 		if (arr.size() > maxsize)
 		{
 			out(arr, num);
-			j = 0;
 			arr.clear();
 		}
 	}
-	string name;
-	name = "..\\files\\damps\\damp" + to_string(num) + "_last.txt";
-//	omp_set_lock(&lock);
-	output(arr, name); //Вывод в файл last
-	arr.clear();
-//	omp_unset_lock(&lock);
+	if (!GetAsyncKeyState(VK_ESCAPE))
+	{
+		string name;
+		name = "..\\files\\damps\\damp" + to_string(num) + "_last.txt";
+		omp_set_lock(&lock);
+		output(arr, name); //Вывод в файл last
+		arr.clear();
+		omp_unset_lock(&lock);
+	}
 }
 
 
 void start()		//Проводим действия начального этапа
 {
 	vector <string> a;
+	vector<string> checkpoints;
 	string fin;
-	init(a, fin);
+	init(a,checkpoints, fin);
+	//cout << "Все параметры успешно загружены" << endl;
 	string name1;
 	string val = "";
 	int file;
 	ifstream infile;
 	int i;
-#pragma omp parallel  private(val,infile,i,file)//shared(checkpoints)  //Создаем потоки
+#pragma omp parallel shared(checkpoints)  //num_threads(a.size()-1) Создаем потоки
 	{
-		file = 1;
-		val = "";
-		omp_init_lock(&lock);
-#pragma omp for 
+#pragma omp for  private(val,infile,i,file) 
 		for (int j = 0; j < a.size(); j++)
 		{
-			int num = omp_get_thread_num();
+			file = 1;
+			val = "";
+			omp_init_lock(&lock);
 			for (i = 1;i < maxfile;i++)
 			{
 				name1 = "..\\files\\damps\\damp" + to_string(omp_get_thread_num()) + "_" + to_string(i) + ".txt";
@@ -289,24 +335,22 @@ void start()		//Проводим действия начального этапа
 					infile.close();
 				}
 			}
-			num = omp_get_thread_num();
 			if (val == "")
 			{
-				val = a.at(num);
+				val = a.at(omp_get_thread_num());
 			}
-			work(fin, val, num);
+			work(fin, val, checkpoints, omp_get_thread_num());
+
 		}
 	}
+	stop(checkpoints);
 }
-void stop()
-{
-	cout << "СТоп";
-}
+
 int main(int argc, char *argv[])	//Основная программа
 {
 	setlocale(LC_ALL, "Russian");
+	flag = true;
 	start();
-	stop();
 	system("Pause");
 	return 0;
 }
