@@ -87,11 +87,8 @@ void output(vector <string> &arr, string name)	//Выводим вектор в файл
 	ofstream fout;
 	fout.open(name, ios::out);
 	if (fout.is_open()) {
-		//while (arr.size())
-		//	{
 		fout << arr.back() << endl;
 		arr.pop_back();
-		//	}
 		fout.close();
 	}
 	else
@@ -177,6 +174,7 @@ bool init(vector<string> &arr, vector<string> &checkpoints, string find) //Иници
 			getline(inpfile, str);
 			arr.push_back(str);
 		}
+		inpfile.close();
 	}
 	else {
 		cout << "Ошибка открытия файла с исходными строками!" << endl << "Требуется перезапуск!" << endl;
@@ -244,18 +242,19 @@ void stop(vector<string> &checkpoints)
 	system("Pause");
 	exit(0);
 }
-void work(string find, string val, vector<string> &checkpoints, int num)		//Выполняем хеширование
+void work(string find, string val, vector<string> *checkpoints, int num)		//Выполняем хеширование
 {
 	vector <string> arr;
 	int j = 0;
 	while (val != find && !GetAsyncKeyState(VK_ESCAPE))
 	{
 		val = Sha256(val); //Получаем новый хеш
-		if (((std::find(checkpoints.begin(), checkpoints.end(), val)) != checkpoints.end()))
+
+		if (((std::find(checkpoints->begin(), checkpoints->end(), val)) != checkpoints->end()))
 		{
 			cout << "Поток номер " << num << " закончил работу!" << endl;
-			checkpoints.push_back(val);
-			outputCheck(checkpoints, check_path);
+			checkpoints->push_back(val);
+			outputCheck(*checkpoints, check_path);
 			cout << "SHA256=" << val << endl;
 
 			system("Pause");
@@ -264,9 +263,7 @@ void work(string find, string val, vector<string> &checkpoints, int num)		//Выпо
 		else {
 			if (j > checkstep)
 			{
-				omp_set_lock(&lock);
-				checkpoints.push_back(val);
-				omp_unset_lock(&lock);
+				checkpoints->push_back(val);
 				j = 0;
 			}
 		}
@@ -339,7 +336,7 @@ void start()		//Проводим действия начального этапа
 				{
 					val = a.at(omp_get_thread_num());
 				}
-				work(fin, val, checkpoints, omp_get_thread_num());
+				work(fin, val, &checkpoints, omp_get_thread_num());
 			}
 		}
 		stop(checkpoints);
