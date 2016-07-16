@@ -197,8 +197,7 @@ bool init(vector<string> &arr, vector<string> &checkpoints, string find) //Иници
 		inpfile.close();
 	}
 	else {
-		cout << "Файл чекпоинтов не найден!" << endl;
-		return false;
+		cout << "Файл чекпоинтов не найден! Он будет создан автоматически!" << endl;
 	}
 	return true;
 }
@@ -302,7 +301,7 @@ void start()		//Проводим действия начального этапа
 		int file;
 		ifstream infile;
 		int i;
-#pragma omp parallel shared(checkpoints)  //num_threads(a.size()-1) Создаем потоки
+#pragma omp parallel  //num_threads(a.size()-1) Создаем потоки
 		{
 #pragma omp for  private(val,infile,i,file) 
 			for (int j = 0; j < a.size(); j++)
