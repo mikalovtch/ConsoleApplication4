@@ -60,7 +60,7 @@ string wcharToString(WCHAR a[])
 FILETIME getLastWriteTime(HANDLE hFile)	//Получаем дату последнего изменения файла
 {
 	FILETIME ftCreate, ftAccess, ftWrite;
-	SYSTEMTIME stUTC, stLocal;
+	SYSTEMTIME stUTC;
 	GetFileTime(hFile, &ftCreate, &ftAccess, &ftWrite);
 	CloseHandle(hFile);
 	// преобразовать время модификации в локальное время.
@@ -96,6 +96,7 @@ void output(vector <string> &arr, string name)	//Выводим вектор в файл
 		cout << "Не могу открыть файл: " << name << endl;
 	}
 }
+
 void outputCheck(vector <string> &arr, string name)	//Выводим вектор в файл
 {
 	ofstream fout;
@@ -234,6 +235,7 @@ void out(vector<string> &arr, int num)
 	output(arr, name); //Вывод в файл
 	omp_unset_lock(&lock);
 }
+
 void stop(vector<string> &checkpoints)
 {
 	flag = false;
@@ -242,6 +244,7 @@ void stop(vector<string> &checkpoints)
 	system("Pause");
 	exit(0);
 }
+
 void work(string find, string val, vector<string> *checkpoints, int num)		//Выполняем хеширование
 {
 	vector <string> arr;
@@ -285,7 +288,6 @@ void work(string find, string val, vector<string> *checkpoints, int num)		//Выпо
 		omp_unset_lock(&lock);
 	}
 }
-
 
 void start()		//Проводим действия начального этапа
 {
