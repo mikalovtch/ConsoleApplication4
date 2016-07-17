@@ -11,7 +11,6 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <list>
 #include "shlwapi.h"
 #include<algorithm>
 #define _AFXDLL
@@ -26,7 +25,7 @@ struct inpout
 	string input;
 	string result;
 };
-list<string> *checkpoints;
+
 omp_lock_t lock;
 CFileFind finder;
 WIN32_FIND_DATA fd;
@@ -88,11 +87,8 @@ void output(vector <string> &arr, string name)	//Выводим вектор в файл
 	ofstream fout;
 	fout.open(name, ios::out);
 	if (fout.is_open()) {
-		while (arr.size() > 0)
-		{
-			fout << arr.back() << endl;
-			arr.pop_back();
-		}
+		fout << arr.back() << endl;
+		arr.pop_back();
 		fout.close();
 	}
 	else
@@ -101,16 +97,15 @@ void output(vector <string> &arr, string name)	//Выводим вектор в файл
 	}
 }
 
-//void outputCheck(vector <string> &arr, string name)	//Выводим вектор в файл
-void outputCheck(list <string> *arr, string name)
+void outputCheck(vector <string> &arr, string name)	//Выводим вектор в файл
 {
 	ofstream fout;
 	fout.open(name, ios::out);
 	if (fout.is_open()) {
-		while (arr->size())
+		while (arr.size())
 		{
-			fout << arr->back() << endl;
-			arr->pop_back();
+			fout << arr.back() << endl;
+			arr.pop_back();
 		}
 		fout.close();
 	}
@@ -153,8 +148,7 @@ string Sha256(const string str)
 	return ss.str();
 }
 
-//bool init(vector<string> &arr, vector<string> &checkpoints, string find) //Инициализация настроек
-bool init(vector<string> &arr, list<string> *&checkpoints, string find)
+bool init(vector<string> &arr, vector<string> &checkpoints, string find) //Инициализация настроек
 {
 	vector<string> set;
 	ifstream inpfile("..\\files\\settings\\settings.txt");
@@ -198,7 +192,7 @@ bool init(vector<string> &arr, list<string> *&checkpoints, string find)
 		{
 			string str;
 			getline(inpfile, str);
-			checkpoints->push_back(str);
+			checkpoints.push_back(str);
 		}
 		inpfile.close();
 	}
@@ -241,8 +235,7 @@ void out(vector<string> &arr, int num)
 	omp_unset_lock(&lock);
 }
 
-//void stop(vector<string> *checkpoints)
-void stop(list<string> *checkpoints)
+void stop(vector<string> &checkpoints)
 {
 	flag = false;
 	cout << "Остановка программы";
@@ -251,20 +244,21 @@ void stop(list<string> *checkpoints)
 	exit(0);
 }
 
-//void work(string find, string val, vector<string> *checkpoints, int num)		//Выполняем хеширование
-void work(string find, string val, int num)	
+void work(string find, string val, vector<string> *checkpoints, int num)		//Выполняем хеширование
 {
 	vector <string> arr;
 	int j = 0;
 	while (val != find && !GetAsyncKeyState(VK_ESCAPE))
 	{
 		val = Sha256(val); //Получаем новый хеш
+
 		if (((std::find(checkpoints->begin(), checkpoints->end(), val)) != checkpoints->end()))
 		{
 			cout << "Поток номер " << num << " закончил работу!" << endl;
 			checkpoints->push_back(val);
-			outputCheck(checkpoints, check_path);
+			outputCheck(*checkpoints, check_path);
 			cout << "SHA256=" << val << endl;
+
 			system("Pause");
 			exit(0);
 		}
@@ -297,8 +291,7 @@ void work(string find, string val, int num)
 void start()		//Проводим действия начального этапа
 {
 	vector <string> a;
-	//vector<string> checkpoints;
-	checkpoints = new list<string>;
+	vector<string> checkpoints;
 	string fin;
 	if (init(a, checkpoints, fin))
 	{
@@ -308,7 +301,7 @@ void start()		//Проводим действия начального этапа
 		int file;
 		ifstream infile;
 		int i;
-#pragma omp parallel shared(checkpoints) num_threads(a.size())// Создаем потоки
+#pragma omp parallel  //num_threads(a.size()-1) Создаем потоки
 		{
 #pragma omp for  private(val,infile,i,file) 
 			for (int j = 0; j < a.size(); j++)
@@ -344,7 +337,7 @@ void start()		//Проводим действия начального этапа
 				{
 					val = a.at(omp_get_thread_num());
 				}
-				work(fin, val, omp_get_thread_num());
+				work(fin, val, &checkpoints, omp_get_thread_num());
 			}
 		}
 		stop(checkpoints);
