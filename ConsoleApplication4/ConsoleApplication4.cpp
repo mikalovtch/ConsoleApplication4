@@ -87,8 +87,11 @@ void output(vector <string> &arr, string name)	//Выводим вектор в файл
 	ofstream fout;
 	fout.open(name, ios::out);
 	if (fout.is_open()) {
-		fout << arr.back() << endl;
-		arr.pop_back();
+		while (arr.size())
+		{
+			fout << arr.back() << endl;
+			arr.pop_back();
+		}
 		fout.close();
 	}
 	else
@@ -150,6 +153,7 @@ string Sha256(const string str)
 
 bool init(vector<string> &arr, vector<string> &checkpoints, string find) //Инициализация настроек
 {
+	omp_set_lock(&lock);
 	vector<string> set;
 	ifstream inpfile("..\\files\\settings\\settings.txt");
 	if (inpfile.is_open())
@@ -163,6 +167,7 @@ bool init(vector<string> &arr, vector<string> &checkpoints, string find) //Иници
 	}
 	else {
 		cout << "Ошибка открытия файла с настройками!" << endl << "Требуется перезапуск!" << endl;
+		omp_unset_lock(&lock);
 		return false;
 	}
 	inpfile.close();
@@ -179,6 +184,7 @@ bool init(vector<string> &arr, vector<string> &checkpoints, string find) //Иници
 	}
 	else {
 		cout << "Ошибка открытия файла с исходными строками!" << endl << "Требуется перезапуск!" << endl;
+		omp_unset_lock(&lock);
 		return false;
 	}
 	find = set.at(0);
@@ -199,6 +205,7 @@ bool init(vector<string> &arr, vector<string> &checkpoints, string find) //Иници
 	else {
 		cout << "Файл чекпоинтов не найден! Он будет создан автоматически!" << endl;
 	}
+	omp_unset_lock(&lock);
 	return true;
 }
 
@@ -244,46 +251,51 @@ void stop(vector<string> &checkpoints)
 	exit(0);
 }
 
-void work(string find, string val, vector<string> *checkpoints, int num)		//Выполняем хеширование
+bool work(string find, string val, vector<string> *checkpoints, int num,bool flag)		//Выполняем хеширование
 {
 	vector <string> arr;
 	int j = 0;
-	while (val != find && !GetAsyncKeyState(VK_ESCAPE))
+	while (val != find && !GetAsyncKeyState(VK_ESCAPE)&&flag)
 	{
-		val = Sha256(val); //Получаем новый хеш
-
-		if (((std::find(checkpoints->begin(), checkpoints->end(), val)) != checkpoints->end()))
+	/*	val = Sha256(val); //Получаем новый хеш
+		omp_set_lock(&lock);
+	if (((std::find(checkpoints->begin(), checkpoints->end(), val)) != checkpoints->end()))
 		{
 			cout << "Поток номер " << num << " закончил работу!" << endl;
 			checkpoints->push_back(val);
-			outputCheck(*checkpoints, check_path);
+		outputCheck(*checkpoints, check_path);
 			cout << "SHA256=" << val << endl;
-
+			flag = false;
 			system("Pause");
-			exit(0);
 		}
 		else {
 			if (j > checkstep)
 			{
-				checkpoints->push_back(val);
+				omp_set_lock(&lock);
+
+			checkpoints->push_back(val);
+				omp_unset_lock(&lock);
 				j = 0;
 			}
 		}
+		omp_unset_lock(&lock);
 		j++;
 		arr.push_back(val);
 		if (arr.size() > maxsize)
 		{
 			out(arr, num);
 			arr.clear();
-		}
+		}*/
 	}
-	if (!GetAsyncKeyState(VK_ESCAPE))
+	if (!GetAsyncKeyState(VK_ESCAPE)||!flag)
 	{
 		string name;
 		name = "..\\files\\damps\\damp" + to_string(num) + "_last.txt";
 		omp_set_lock(&lock);
 		output(arr, name); //Вывод в файл last
 		arr.clear();
+		string check_pat = "..\\files\\checkpoint\\checkpoints_"+to_string(omp_get_thread_num())+".txt";
+		outputCheck(*checkpoints, check_pat);
 		omp_unset_lock(&lock);
 	}
 }
@@ -293,6 +305,11 @@ void start()		//Проводим действия начального этапа
 	vector <string> a;
 	vector<string> checkpoints;
 	string fin;
+	bool flag;
+
+	{
+		flag = true;
+		omp_init_lock(&lock);
 	if (init(a, checkpoints, fin))
 	{
 		cout << "Все параметры успешно загружены" << endl;
@@ -301,18 +318,19 @@ void start()		//Проводим действия начального этапа
 		int file;
 		ifstream infile;
 		int i;
-#pragma omp parallel  //num_threads(a.size()-1) Создаем потоки
-		{
+#pragma omp parallel shared(a,fin,checkpoints,flag) //num_threads(a.size()-1) Создаем потоки
 #pragma omp for  private(val,infile,i,file) 
 			for (int j = 0; j < a.size(); j++)
 			{
+				infile.close();
 				file = 1;
 				val = "";
-				omp_init_lock(&lock);
+			
 				for (i = 1;i < maxfile;i++)
 				{
+					infile.close(); 
 					name1 = "..\\files\\damps\\damp" + to_string(omp_get_thread_num()) + "_" + to_string(i) + ".txt";
-					infile.open(name1);
+					infile.open(name1); //Heap error
 					if (!infile.is_open())
 					{
 						continue;
@@ -337,15 +355,16 @@ void start()		//Проводим действия начального этапа
 				{
 					val = a.at(omp_get_thread_num());
 				}
-				work(fin, val, &checkpoints, omp_get_thread_num());
+				work(fin, val, &checkpoints, omp_get_thread_num(),flag);
 			}
-		}
+
 		stop(checkpoints);
 	}
 	else {
 		cout << "Ошибка инициализации!" << endl;
 		system("Pause");
 		exit(-1);
+	}
 	}
 }
 
