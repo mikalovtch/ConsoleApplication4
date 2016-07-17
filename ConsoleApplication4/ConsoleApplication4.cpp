@@ -26,7 +26,6 @@ struct inpout
 	string input;
 	string result;
 };
-list<string> *checkpoints;
 omp_lock_t lock;
 CFileFind finder;
 WIN32_FIND_DATA fd;
@@ -101,8 +100,7 @@ void output(vector <string> &arr, string name)	//Выводим вектор в файл
 	}
 }
 
-//void outputCheck(vector <string> &arr, string name)	//Выводим вектор в файл
-void outputCheck(list <string> *arr, string name)
+void outputCheck(vector <string> &arr, string name)	//Выводим вектор в файл
 {
 	ofstream fout;
 	fout.open(name, ios::out);
@@ -153,7 +151,7 @@ string Sha256(const string str)
 	return ss.str();
 }
 
-//bool init(vector<string> &arr, vector<string> &checkpoints, string find) //Инициализация настроек
+bool init(vector<string> &arr, vector<string> &checkpoints, string find) //Инициализация настроек
 bool init(vector<string> &arr, list<string> *&checkpoints, string find)
 {
 	vector<string> set;
@@ -298,9 +296,9 @@ void start()		//Проводим действия начального этапа
 {
 	vector <string> a;
 	//vector<string> checkpoints;
-	checkpoints = new list<string>;
+	list<string> *checkpoints1 = new list<string>;
 	string fin;
-	if (init(a, checkpoints, fin))
+	if (init(a, checkpoints1, fin))
 	{
 		cout << "Все параметры успешно загружены" << endl;
 		string name1;
