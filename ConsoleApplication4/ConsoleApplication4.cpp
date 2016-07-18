@@ -319,7 +319,7 @@ void start()		//Проводим действия начального этапа
 		ifstream infile;
 		int i;
 #pragma omp parallel shared(a,fin,checkpoints,flag) //num_threads(a.size()-1) Создаем потоки
-#pragma omp for  private(val,infile,i,file) 
+#pragma omp for  private(val,i,file) 
 			for (int j = 0; j < a.size(); j++)
 			{
 				infile.close();
